@@ -1,0 +1,15 @@
+#define J 74
+#define K 75
+#define j 106
+#define k 107
+#define UP 1755
+#define DOWN 1782
+#define LEFT 1836
+#define RIGHT 1809
+#define DEL 173502
+#define INSERT 170100
+#define HOME 1944
+#define END 1890
+#define PAGE_UP 180306
+#define PAGE_DOWN 183708
+#define PRINTSCR 1402668266
