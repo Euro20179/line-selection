@@ -3,9 +3,14 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+#include <getopt.h>
 #include <sys/time.h>
 
 #include "keys.h"
+
+#ifndef DEBUG
+#define DEBUG 0
+#endif
 
 #define MAX_KEY_LENGTH 10
 #define bool _Bool
@@ -18,6 +23,10 @@ struct buffer{
     int size;
     char* buffer;
 };
+
+typedef struct{
+    bool doNumbering;
+} opts;
 
 struct buffer readChars(int size){
     char buf[size];
@@ -108,22 +117,30 @@ void clear(){
     fprintf(stderr, "\033[1;1H\033[2J");
 }
 
-void printLines(const char* lines){
+void printLines(const char* lines, bool doNumbering){
     int lineNo = 0;
     bool printedColor = false;
     for(int i = 0; i < strlen(lines); i++){
+	if(i == 0 && doNumbering) //print the line number on the first character
+	    fprintf(stderr, "%d: ", lineNo);
+
 	if(lineNo == selectedLine && printedColor == false){
 	    fprintf(stderr, "%s", "\033[42m");
 	    printedColor = true;
 	}
+	//print current character before checking if new line so that current line number is displayed first
+	fprintf(stderr, "%c", lines[i]);
 	if(lines[i] == '\n'){
 	    if(lineNo == selectedLine){
 		fprintf(stderr, "%s", "\033[0m");
 		printedColor = false;
 	    }
 	    lineNo++;
+	    if(doNumbering){
+		//print line number at start of line
+		fprintf(stderr, "%d: ", lineNo);
+	    }
 	}
-	fprintf(stderr, "%c", lines[i]);
     }
     fprintf(stderr, "\033[0m\n");
 }
@@ -172,13 +189,36 @@ void delString(char* str){
     free(str);
 }
 
+opts getOpts(int argc, char* argv[]){
+    int opt;
+    opts options = { false };
+    while ((opt = getopt(argc, argv, "n")) != -1){
+	switch(opt){
+	    case 'n':
+		options.doNumbering = true;
+		return options;
+	}
+    }
+    return options;
+}
 
-int main(const int argc, const char* argv[]){
+int keyCodeToInt(int keyCode){
+    if(keyCode < 48 || keyCode > 57)
+	return -1;
+    return keyCode - 48;
+}
+
+void printAtBottomOfScreen(char* t){
+    fprintf(stderr, "\033[10;0H%s", t);
+}
+
+int main(int argc, char* argv[]){
+    opts options = getOpts(argc, argv);
     if(argc < 2){
 	fprintf(stderr, "No input file given\n");
 	return 1;
     }
-    const char* fp = argv[1];
+    const char* fp = argv[optind];
     FILE* fd = fopen(fp, "r");
     if(fd == NULL){
 	fprintf(stderr, "An error occured while trying to open the file\n");
@@ -203,7 +243,7 @@ int main(const int argc, const char* argv[]){
 
     const int lineCount = getLineCount(lines);
     clear();
-    printLines(lines);
+    printLines(lines, options.doNumbering);
     while(true){
 	struct buffer buff = readChars(MAX_KEY_LENGTH);
 	clear();
@@ -212,15 +252,63 @@ int main(const int argc, const char* argv[]){
 	int keyNumber = getKeyRepr(keyPressSize, keyPress);
 	switch(keyNumber){
 	    case 0: continue;
+	    case q: return 5; //slightly different return codes just in case scripting wants to do something with it
+	    case Q: return 6; //slightly different return codes just in case scripting wants to do something with i
 	    case 10:
 		printStrLine(lines, selectedLine);
 		return 0;
+	    case ZERO:
+	    case ONE:
+	    case TWO:
+	    case THREE:
+	    case FOUR:
+	    case FIVE:
+	    case SIX:
+	    case SEVEN:
+	    case EIGHT:
+	    case NINE:
+		int i = keyCodeToInt(keyNumber);
+		if(lineCount >= i){
+		    printStrLine(lines, i);
+		    return 0;
+		}
+		break;
+	    case DOLLAR:
+		printStrLine(lines, lineCount);
+		return 0;
+	    case PLUS: {
+		char lineToGoTo[6];
+		lineToGoTo[0] = '\0';
+		while(true){
+		    clear();
+		    printLines(lines, options.doNumbering);
+		    struct buffer buff = readChars(MAX_KEY_LENGTH);
+		    char* keyPress = buff.buffer;
+		    const int keyPressSize = buff.size;
+		    int keyNumber = getKeyRepr(keyPressSize, keyPress);
+		    if(keyNumber == 10) break;
+		    int i = keyCodeToInt(keyNumber);
+		    if(i == -1) continue;
+		    strncat(lineToGoTo, (char*)&keyNumber, 1);
+		}
+		int realLine = atoi(lineToGoTo);
+		if(realLine <= lineCount){
+		    selectedLine = realLine;
+		}
+		clear();
+#if DEBUG == 1
+		    printf("%s\n", lineToGoTo);
+#endif
+		break;
+	    }
+	    case n:
 	    case j:
 	    case DOWN:
 		if(selectedLine < lineCount){
 		    selectedLine++;
 		}
 		break;
+	    case p:
 	    case k:
 	    case UP:
 		if(selectedLine > 0){
@@ -228,6 +316,9 @@ int main(const int argc, const char* argv[]){
 		}
 		break;
 	}
-	printLines(lines);
+#if DEBUG == 1
+	printKey(keyPressSize, keyPress);
+#endif
+	printLines(lines, options.doNumbering);
     }
 }
