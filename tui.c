@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <sys/time.h>
+#include <sys/ioctl.h>
 
 #include "keys.h"
 
@@ -16,6 +17,9 @@
 #define bool _Bool
 #define true 1
 #define false 0
+
+static int COLS;
+static int LINES;
 
 int selectedLine = 0;
 
@@ -117,11 +121,27 @@ void clear(){
     fprintf(stderr, "\033[1;1H\033[2J");
 }
 
-void printLines(const char* lines, bool doNumbering){
-    int lineNo = 0;
-    bool printedColor = false;
+int getFirstCharIndexOfLineNumber(int lineNo, const char* lines){
+    int line = 0;
     for(int i = 0; i < strlen(lines); i++){
-	if(i == 0 && doNumbering) //print the line number on the first character
+	if(lines[i] == '\n'){
+	    line++;
+	}
+	if(line == lineNo){
+	    return i;
+	}
+    }
+    return -1;
+}
+
+void printLines(int currentLine, const char* lines, bool doNumbering){
+    int lineNo = currentLine;
+    int printedLineCount = 0;
+    bool printedColor = false;
+    int start = getFirstCharIndexOfLineNumber(currentLine, lines);
+    if(lines[start] == '\n')start++;
+    for(int i = start; i < strlen(lines); i++){
+	if(i == start && doNumbering) //print the line number on the first character
 	    fprintf(stderr, "%d: ", lineNo);
 
 	if(lineNo == selectedLine && printedColor == false){
@@ -131,11 +151,14 @@ void printLines(const char* lines, bool doNumbering){
 	//print current character before checking if new line so that current line number is displayed first
 	fprintf(stderr, "%c", lines[i]);
 	if(lines[i] == '\n'){
+	    if(printedLineCount + 3 >= LINES)
+		break;
 	    if(lineNo == selectedLine){
 		fprintf(stderr, "%s", "\033[0m");
 		printedColor = false;
 	    }
 	    lineNo++;
+	    printedLineCount++;
 	    if(doNumbering){
 		//print line number at start of line
 		fprintf(stderr, "%d: ", lineNo);
@@ -213,6 +236,11 @@ void printAtBottomOfScreen(char* t){
 }
 
 int main(int argc, char* argv[]){
+    struct winsize size;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &size);
+    COLS = size.ws_col;
+    LINES = size.ws_row;
+
     opts options = getOpts(argc, argv);
     if(argc < 2){
 	fprintf(stderr, "No input file given\n");
@@ -243,7 +271,7 @@ int main(int argc, char* argv[]){
 
     const int lineCount = getLineCount(lines);
     clear();
-    printLines(lines, options.doNumbering);
+    printLines(selectedLine, lines, options.doNumbering);
     while(true){
 	struct buffer buff = readChars(MAX_KEY_LENGTH);
 	clear();
@@ -281,7 +309,7 @@ int main(int argc, char* argv[]){
 		lineToGoTo[0] = '\0';
 		while(true){
 		    clear();
-		    printLines(lines, options.doNumbering);
+		    printLines(selectedLine, lines, options.doNumbering);
 		    struct buffer buff = readChars(MAX_KEY_LENGTH);
 		    char* keyPress = buff.buffer;
 		    const int keyPressSize = buff.size;
@@ -319,6 +347,6 @@ int main(int argc, char* argv[]){
 #if DEBUG == 1
 	printKey(keyPressSize, keyPress);
 #endif
-	printLines(lines, options.doNumbering);
+	printLines(selectedLine, lines, options.doNumbering);
     }
 }
