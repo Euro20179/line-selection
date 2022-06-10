@@ -349,4 +349,5 @@ int main(int argc, char* argv[]){
 #endif
 	printLines(selectedLine, lines, options.doNumbering);
     }
+    delString(lines);
 }
