@@ -77,8 +77,6 @@ struct buffer readChars(int size){
     for(int i = 0; i < bufLength; i++){
 	bufferBuffer[i] = buf[i];
     }
-    //apparently special key presses not being read if it is the first key press is a flushing issue?
-    fflush(stdout);
     return rv;
 }
 
@@ -112,7 +110,7 @@ void printKey(int size, char* fullKeyPress){
 
     char keyRepr[MAX_KEY_LENGTH];
     getKeyStrRepr(size, fullKeyPress, keyRepr);
-    printf("%d: %s\n", numRepr, keyRepr);
+    fprintf(stderr, "%d: %s\n", numRepr, keyRepr);
 }
 
 void clear(){
@@ -164,6 +162,7 @@ void printLines(int currentLine, const char* lines, bool doNumbering){
 	}
     }
     fprintf(stderr, "\033[0m\n");
+    fflush(stderr);
 }
 
 const int getLineCount(const char* string){
@@ -238,7 +237,7 @@ void printAtBottomOfScreen(char* t){
 
 int main(int argc, char* argv[]){
     struct winsize size;
-    ioctl(STDOUT_FILENO, TIOCGWINSZ, &size);
+    ioctl(STDERR_FILENO, TIOCGWINSZ, &size);
     COLS = size.ws_col;
     LINES = size.ws_row;
 
@@ -326,6 +325,9 @@ int main(int argc, char* argv[]){
 		lineToGoTo[0] = '\0';
 		while(true){
 		    clear();
+		    fflush(stderr);
+		    fprintf(stderr, "\033[%d;1H%s%s", LINES,  "+", lineToGoTo);
+		    fprintf(stderr, "\033[1;1H");
 		    printLines(selectedLine, lines, options.doNumbering);
 		    struct buffer buff = readChars(MAX_KEY_LENGTH);
 		    char* keyPress = buff.buffer;
@@ -342,7 +344,7 @@ int main(int argc, char* argv[]){
 		}
 		clear();
 #if DEBUG == 1
-		    printf("%s\n", lineToGoTo);
+		printf("%s\n", lineToGoTo);
 #endif
 		break;
 	    }
