@@ -235,6 +235,10 @@ void printAtBottomOfScreen(char* t){
     fprintf(stderr, "\033[10;0H%s", t);
 }
 
+int top(){
+    return fprintf(stderr, "\033[1;1H");
+}
+
 int main(int argc, char* argv[]){
     struct winsize size;
     ioctl(STDERR_FILENO, TIOCGWINSZ, &size);
@@ -325,9 +329,10 @@ int main(int argc, char* argv[]){
 		lineToGoTo[0] = '\0';
 		while(true){
 		    clear();
-		    fflush(stderr);
-		    fprintf(stderr, "\033[%d;1H%s%s", LINES,  "+", lineToGoTo);
-		    fprintf(stderr, "\033[1;1H");
+		    //move cursor to bottom of screen, very left;
+		    fprintf(stderr, "\033[1m\033[%d;1H%s%s\033[0m", LINES,  "+", lineToGoTo);
+		    //move cursor back to top
+		    top();
 		    printLines(selectedLine, lines, options.doNumbering);
 		    struct buffer buff = readChars(MAX_KEY_LENGTH);
 		    char* keyPress = buff.buffer;
