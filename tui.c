@@ -30,6 +30,7 @@ struct buffer{
 
 typedef struct{
     bool doNumbering;
+    bool onlyPrintKeyCodes;
 } opts;
 
 struct buffer readChars(int size){
@@ -92,29 +93,26 @@ int getKeyRepr(int size, char* fullKeyPress){
 }
 
 //USE FREE
-char* getKeyStrRepr(int size, char* fullKeyPress){
-    char* buf = malloc(MAX_KEY_LENGTH);
+void getKeyStrRepr(int size, char* fullKeyPress, char* into){
     if(size > 1){
-	buf[0] = '[';
+	into[0] = '[';
 	for(int i = 1; i < size; i++){
-	    buf[i - 1] = fullKeyPress[i];
+	    into[i - 1] = fullKeyPress[i];
 	}
-	buf[size - 1] = '\0';
-	return buf;
+	into[size - 1] = '\0';
     }
     else{
-	buf[0] = fullKeyPress[0];
-	buf[1] = '\0';
-	return buf;
+	into[0] = fullKeyPress[0];
+	into[1] = '\0';
     }
 }
 
 void printKey(int size, char* fullKeyPress){
     int numRepr = getKeyRepr(size, fullKeyPress);
 
-    char* keyRepr = getKeyStrRepr(size, fullKeyPress);
+    char keyRepr[MAX_KEY_LENGTH];
+    getKeyStrRepr(size, fullKeyPress, keyRepr);
     printf("%d: %s\n", numRepr, keyRepr);
-    free(keyRepr);
 }
 
 void clear(){
@@ -215,11 +213,14 @@ void delString(char* str){
 opts getOpts(int argc, char* argv[]){
     int opt;
     opts options = { false };
-    while ((opt = getopt(argc, argv, "n")) != -1){
+    while ((opt = getopt(argc, argv, "nK")) != -1){
 	switch(opt){
 	    case 'n':
 		options.doNumbering = true;
-		return options;
+		break;
+	    case 'K':
+		options.onlyPrintKeyCodes = true;
+		break;
 	}
     }
     return options;
@@ -242,6 +243,22 @@ int main(int argc, char* argv[]){
     LINES = size.ws_row;
 
     opts options = getOpts(argc, argv);
+    //this should be treated as isolated code
+    //we could just put this in the while loop but that's messier imo
+    {
+	if(options.onlyPrintKeyCodes){
+	    clear();
+	    while(true){
+		struct buffer buff = readChars(MAX_KEY_LENGTH);
+		clear();
+		char* keyPress = buff.buffer;
+		const int keyPressSize = buff.size;
+		printKey(keyPressSize, keyPress);
+	    }
+	    return 0;
+	}
+    }
+    //END ISOLATED CODE
     if(argc < 2){
 	fprintf(stderr, "No input file given\n");
 	return 1;
